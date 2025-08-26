@@ -6,24 +6,12 @@ generator client {
 }
 
 datasource db {
-    provider = "mysql"
+    provider = "postgresql"
     // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
     // Further reading:
     // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
     // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
     url      = env("DATABASE_URL")
-}
-
-model Post {
-    id        Int      @id @default(autoincrement())
-    name      String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    createdBy   User   @relation(fields: [createdById], references: [id])
-    createdById String
-
-    @@index([name])
 }
 
 // Necessary for Next auth
@@ -33,7 +21,7 @@ model Account {
     type                     String
     provider                 String
     providerAccountId        String
-    refresh_token            String? @db.Text
+    refresh_token            String? // @db.Text
     access_token             String? // @db.Text
     expires_at               Int?
     token_type               String?
@@ -57,12 +45,27 @@ model Session {
 model User {
     id            String    @id @default(cuid())
     name          String?
-    email         String?   @unique
+    email         String?
     emailVerified DateTime?
+    passwordHash  String?
     image         String?
     accounts      Account[]
     sessions      Session[]
-    posts         Post[]
+
+    role Role @default(EDITOR)
+
+    // Relations d’édition
+    PagesCreated Page[]         @relation("PageCreatedBy")
+    PagesUpdated Page[]         @relation("PageUpdatedBy")
+    Medias       Media[]
+    Revisions    PageRevision[]
+    AuditLogs    AuditLog[]     @relation("AuditActor")
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([email])
+    @@index([email])
 }
 
 model VerificationToken {
@@ -71,4 +74,198 @@ model VerificationToken {
     expires    DateTime
 
     @@unique([identifier, token])
+}
+
+// ------------------------
+// Réglages globaux (thème, branding)
+// ------------------------
+
+model Setting {
+    id String @id @default("SETTINGS")
+
+    siteName String
+    slogan   String?
+    domain   String? // ex: "https://www.exemple.com"
+
+    // Identité visuelle
+    logoId String?
+    Logo   Media?  @relation("SettingLogo", fields: [logoId], references: [id], onDelete: SetNull)
+
+    // Thème administrable (CSS variables côté front)
+    primaryColor    String? // ex: "#1D4ED8"
+    secondaryColor  String?
+    backgroundColor String?
+    textColor       String?
+
+    // SEO global par défaut (surchargé par Page)
+    defaultSeoTitle String?
+    defaultSeoDesc  String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+// ------------------------
+// Médias (bibliothèque d’assets)
+// ------------------------
+
+model Media {
+    id   String    @id @default(cuid())
+    kind MediaKind @default(IMAGE)
+
+    checksum  String? @unique
+    url       String  @unique // URL publique (CDN)
+    mimeType  String
+    width     Int?
+    height    Int?
+    sizeBytes Int?
+    alt       String?
+
+    createdById String?
+    createdBy   User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+    createdAt  DateTime       @default(now())
+    updatedAt  DateTime       @updatedAt
+    LogoOf     Setting[]      @relation("SettingLogo")
+    SeoImageOf Page[]         @relation("PageSeoImage")
+    SeoOfRev   PageRevision[] @relation("RevisionSeoImage")
+
+    @@index([kind])
+    @@index([mimeType])
+}
+
+// ------------------------
+// Pages (rendu par blocs JSON + SEO)
+// Mapping URL: path complet (ex: "/", "/a-propos", "/blog/mon-article")
+// i18n : utiliser `locale` si vous gérez plusieurs langues SANS préfixe dans path.
+// ------------------------
+
+model Page {
+    id     String @id @default(cuid())
+    title  String
+    path   String @unique
+    locale String @default("fr")
+
+    status      PageStatus @default(DRAFT)
+    publishedAt DateTime?
+
+    // Contenu principal — document Lexical (JSON)
+    content Json
+
+    // SEO
+    seoTitle   String?
+    seoDesc    String?
+    seoImageId String?
+    SeoImage   Media?  @relation("PageSeoImage", fields: [seoImageId], references: [id], onDelete: SetNull)
+    seoNoIndex Boolean @default(false)
+
+    // Traçabilité
+    createdById String?
+    CreatedBy   User?   @relation("PageCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+    updatedById String?
+    UpdatedBy   User?   @relation("PageUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    Revisions PageRevision[]
+
+    @@unique([path, locale])
+    @@index([status, publishedAt])
+    @@index([locale])
+}
+
+// ------------------------
+// Révisions de pages (historique + diff possible)
+// ------------------------
+
+model PageRevision {
+    id     String @id @default(cuid())
+    pageId String
+    page   Page   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+    version    Int
+    title      String?
+    content    Json
+    seoTitle   String?
+    seoDesc    String?
+    seoImageId String?
+    seoImage   Media?  @relation("RevisionSeoImage", fields: [seoImageId], references: [id], onDelete: SetNull)
+
+    createdById String?
+    createdBy   User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+    createdAt DateTime @default(now())
+
+    @@unique([pageId, version])
+    @@index([createdAt])
+}
+
+// ------------------------
+// Redirections 301/302 (ancien → nouveau path)
+// ------------------------
+
+model Redirect {
+    id        String   @id @default(cuid())
+    fromPath  String   @unique // ex: "/ancien-slug"
+    toPath    String // ex: "/nouveau-slug"
+    permanent Boolean  @default(true) // true → 301, false → 302
+    createdAt DateTime @default(now())
+    hits      Int      @default(0)
+
+    @@index([permanent])
+}
+
+// ------------------------
+// Audit log (qui fait quoi, quand)
+// ------------------------
+
+model AuditLog {
+    id         String          @id @default(cuid())
+    action     AuditAction
+    actorId    String?
+    actor      User?           @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+    targetType AuditTargetType @default(PAGE) // "Page" | "Media" | "Setting" | ...
+    targetId   String?
+    meta       Json?
+
+    createdAt DateTime @default(now())
+
+    @@index([action, createdAt])
+    @@index([targetType, targetId])
+}
+
+enum Role {
+    ADMIN
+    EDITOR
+    VIEWER
+}
+
+enum AuditAction {
+    CREATE
+    READ
+    UPDATE
+    DELETE
+}
+
+enum MediaKind {
+    IMAGE
+    VIDEO
+    AUDIO
+    DOCUMENT
+    OTHER
+}
+
+enum PageStatus {
+    DRAFT
+    PUBLISHED
+    ARCHIVED
+}
+
+enum AuditTargetType {
+    PAGE
+    MEDIA
+    SETTING
+    USER
+    REDIRECT
 }
