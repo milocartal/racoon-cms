@@ -136,7 +136,7 @@ modification, redistribution ou exploitation commerciale n’est autorisée.
 - Redistribuer, publier des copies ou proposer des builds.
 - Déployer ce code en production ou vendre un service basé dessus.
 
-Pour toute demande de licence ou d’exception : <ton.email@domaine.tld>.
+Pour toute demande de licence ou d’exception : <milo.cartal.pro@gmail.com>.
 
 Référence : voir le fichier [LICENSE](./LICENSE).
 
