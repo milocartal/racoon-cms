@@ -3,19 +3,12 @@ import { TRPCError } from "@trpc/server";
 import { argon2id, hash } from "argon2";
 
 import { z } from "zod";
-import { RoleEnum } from "~/lib/models/User";
+import { createUserSchema } from "~/lib/models/User";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { db } from "~/server/db";
 
 import { can } from "~/utils/accesscontrol";
-
-const createUserSchema = z.object({
-  name: z.string(),
-  email: z.string().email(),
-  password: z.string(),
-  role: RoleEnum,
-});
 
 export const userRouter = createTRPCRouter({
   //Permet de recuperer l'utilisateur actuel

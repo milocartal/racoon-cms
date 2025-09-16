@@ -5,7 +5,11 @@ import type { Session } from "next-auth";
 export const ac = new AccessControl();
 
 //Anonyme
-ac.grant("viewer").readAny("public");
+ac.grant("viewer")
+  .readAny("public")
+  .readAny("page")
+  .readAny("media")
+  .readAny("settings");
 
 //Utilisateur
 ac.grant("editor")
@@ -14,10 +18,12 @@ ac.grant("editor")
   .readOwn("user")
   .updateOwn("user")
   .deleteOwn("user")
-  .readAny("page")
   .createOwn("page")
   .updateOwn("page")
-  .deleteOwn("page");
+  .deleteOwn("page")
+  .createOwn("media")
+  .updateOwn("media")
+  .deleteOwn("media");
 
 //Admin
 ac.grant("admin")
@@ -34,6 +40,10 @@ ac.grant("admin")
   .createAny("page")
   .updateAny("page")
   .deleteAny("page")
+  .readAny("media")
+  .createAny("media")
+  .updateAny("media")
+  .deleteAny("media")
   .updateAny("settings");
 
 /**

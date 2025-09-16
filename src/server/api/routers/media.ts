@@ -1,7 +1,5 @@
 import { z } from "zod";
-
 import { TRPCError } from "@trpc/server";
-
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -9,85 +7,83 @@ import {
 } from "~/server/api/trpc";
 import { db } from "~/server/db";
 import { can } from "~/utils/accesscontrol";
-import { pageSchema } from "~/lib/models/Pages";
-import type { InputJsonValue } from "@prisma/client/runtime/library";
+import { mediaSchema } from "~/lib/models/Media";
+import { toSlug } from "~/lib/utils";
 
-export const pagesRouter = createTRPCRouter({
+export const mediaRouter = createTRPCRouter({
   get: publicProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
-      return await db.page.findUnique({
+      return await db.media.findUnique({
         where: { id: input.id },
       });
     }),
 
   create: protectedProcedure
-    .input(pageSchema)
+    .input(mediaSchema)
     .mutation(async ({ input, ctx }) => {
-      if (!can(ctx.session).createAny("pages").granted) {
+      if (!can(ctx.session).createAny("media").granted) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "You do not have permission to create pages.",
+          message: "You do not have permission to create media.",
         });
       }
 
-      const content = JSON.parse(input.content) as InputJsonValue;
+      const slug = toSlug(input.name);
 
-      const page = await db.page.create({
+      const media = await db.media.create({
         data: {
           ...input,
-          content,
+          url: input.url ?? `/media/${slug}`,
+          createdById: ctx.session.user.id,
         },
       });
 
-      return page;
+      return media;
     }),
 
   update: protectedProcedure
-    .input(pageSchema.extend({ id: z.string() }))
+    .input(mediaSchema.extend({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      if (!can(ctx.session).updateAny("pages").granted) {
+      if (!can(ctx.session).updateAny("media").granted) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "You do not have permission to update pages.",
+          message: "You do not have permission to update media.",
         });
       }
 
-      const content = JSON.parse(input.content) as InputJsonValue;
-
-      const page = await db.page.update({
+      const media = await db.media.update({
         where: { id: input.id },
         data: {
           ...input,
-          content,
         },
       });
 
-      return page;
+      return media;
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      if (!can(ctx.session).deleteAny("pages").granted) {
+      if (!can(ctx.session).deleteAny("media").granted) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "You do not have permission to delete pages.",
+          message: "You do not have permission to delete media.",
         });
       }
 
-      const page = await db.page.findUnique({
+      const media = await db.media.findUnique({
         where: { id: input.id },
       });
 
-      if (!page) {
+      if (!media) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Page not found.",
+          message: "Media not found.",
         });
       }
 
-      await db.page.delete({
+      await db.media.delete({
         where: { id: input.id },
       });
 

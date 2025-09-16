@@ -16,3 +16,10 @@ export const RoleDisplay = {
 };
 
 export const RoleEnum = z.nativeEnum(Role);
+
+export const createUserSchema = z.object({
+  name: z.string(),
+  email: z.string().email(),
+  password: z.string(),
+  role: RoleEnum,
+});

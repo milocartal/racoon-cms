@@ -111,7 +111,8 @@ model Setting {
 
 model Media {
     id   String    @id @default(cuid())
-    kind MediaKind @default(IMAGE)
+    name String
+    kind MediaKind @default(OTHER)
 
     checksum  String? @unique
     url       String  @unique // URL publique (CDN)
