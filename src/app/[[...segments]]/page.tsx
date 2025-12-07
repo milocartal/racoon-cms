@@ -1,5 +1,5 @@
 // app/[[...segments]]/page.tsx
-import { notFound, redirect } from "next/navigation";
+import { notFound, redirect, RedirectType } from "next/navigation";
 import { draftMode } from "next/headers";
 import { db } from "~/server/db";
 import { auth } from "~/server/auth";
@@ -42,10 +42,10 @@ export default async function PageRoute({
   if (r) {
     if (r.permanent) {
       // 301
-      redirect(r.toPath);
+      redirect(r.toPath, RedirectType.replace);
     } else {
       // 302
-      redirect(r.toPath);
+      redirect(r.toPath, RedirectType.push);
     }
   }
 
